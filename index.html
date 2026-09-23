@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Космічна Таблиця Множення</title>
+  <!-- Підключення бібліотеки canvas-confetti для ефекту салюту -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Exo+2:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 20%, #162447 0%, #0d1326 60%, #050814 100%);
+      --hud-panel-bg: rgba(13, 22, 45, 0.75);
+      --hud-border: rgba(45, 125, 240, 0.45);
+      --hud-glow: rgba(0, 212, 255, 0.25);
+      --cyan-neon: #00f0ff;
+      --cyan-bright: #38bdf8;
+      --blue-accent: #1d4ed8;
+      --text-white: #f1f5f9;
+      --text-muted: #94a3b8;
+      --success-neon: #22c55e;
+      --error-neon: #ef4444;
+      --warning-neon: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg-gradient);
+      font-family: 'Exo 2', sans-serif;
+      color: var(--text-white);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      overflow-x: hidden;
+    }
+
+    /* Головний контейнер HUD */
+    .hud-card {
+      width: 100%;
+      max-width: 680px;
+      background: var(--hud-panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--hud-border);
+      box-shadow: 0 0 35px var(--hud-glow), inset 0 0 20px rgba(0, 212, 255, 0.05);
+      border-radius: 28px;
+      padding: 24px;
+      position: relative;
+    }
+
+    /* Верхня інформаційна панель */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      font-weight: 700;
+    }
+
+    .progress-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--cyan-bright);
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      background: var(--cyan-neon);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--cyan-neon);
+    }
+
+    .badge-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pill-badge {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 5px 12px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+    }
+
+    .pill-badge span.val {
+      color: var(--cyan-neon);
+      font-family: 'Orbitron', monospace;
+    }
+
+    .streak-val {
+      color: #fbbf24 !important;
+    }
+
+    /* Лінія прогресу */
+    .progress-track {
+      width: 100%;
+      height: 5px;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 5%;
+      background: linear-gradient(90deg, #00d4ff, #38bdf8);
+      box-shadow: 0 0 10px #00d4ff;
+      transition: width 0.35s ease;
+    }
+
+    /* Нумерація завдань 1-20 */
+    .steps-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px;
+      background: rgba(10, 15, 30, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 999px;
+      padding: 6px 12px;
+      margin-bottom: 22px;
+      overflow-x: auto;
+    }
+
+    .step-item {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      transition: all 0.25s ease;
+      flex-shrink: 0;
+    }
+
+    .step-item.active {
+      background: var(--cyan-neon);
+      color: #050814;
+      box-shadow: 0 0 12px var(--cyan-neon);
+      font-weight: 900;
+    }
+
+    .step-item.passed {
+      color: var(--cyan-bright);
+      border: 1px solid rgba(56, 189, 248, 0.6);
+    }
+
+    .step-item.failed {
+      color: var(--error-neon);
+      border: 1px solid rgba(239, 68, 68, 0.6);
+    }
+
+    /* Центральний модуль задачі */
+    .module-card {
+      background: rgba(8, 14, 30, 0.6);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .module-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .category-chip {
+      background: rgba(30, 58, 138, 0.4);
+      border: 1px solid #2563eb;
+      color: #93c5fd;
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .status-chip {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .problem-title {
+      font-family: 'Orbitron', sans-serif;
+      text-align: center;
+      font-size: 1.25rem;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(255,255,255,0.2);
+    }
+
+    .problem-desc {
+      text-align: center;
+      font-size: 0.95rem;
+      color: #cbd5e1;
+      margin-bottom: 24px;
+    }
+
+    /* Дисплей математичного виразу */
+    .math-display-panel {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1.5px solid rgba(56, 189, 248, 0.4);
+      box-shadow: inset 0 0 25px rgba(0, 212, 255, 0.1);
+      border-radius: 16px;
+      padding: 28px 16px;
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .math-expression {
+      font-family: 'Orbitron', monospace;
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: 4px;
+      text-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
+    }
+
+    /* Блок введення */
+    .input-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+
+    .answer-field {
+      width: 100%;
+      height: 54px;
+      background: rgba(13, 20, 39, 0.9);
+      border: 1.5px solid rgba(56, 189, 248, 0.5);
+      border-radius: 14px;
+      font-family: 'Orbitron', monospace;
+      font-size: 1.6rem;
+      text-align: center;
+      color: var(--cyan-neon);
+      outline: none;
+      transition: all 0.25s ease;
+      box-shadow: inset 0 0 12px rgba(0,0,0,0.5);
+    }
+
+    .answer-field:focus {
+      border-color: var(--cyan-neon);
+      box-shadow: 0 0 18px rgba(0, 240, 255, 0.35);
+    }
+
+    .answer-field.shake {
+      animation: shake 0.4s ease;
+      border-color: var(--error-neon);
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.4);
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    .submit-button {
+      height: 50px;
+      background: linear-gradient(135deg, #1e40af, #2563eb);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      border-radius: 12px;
+      color: white;
+      font-family: 'Exo 2', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.35);
+    }
+
+    .submit-button:hover {
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .submit-button:active {
+      transform: translateY(1px);
+    }
+
+    /* Індикатор спроб і підказок */
+    .attempt-hint {
+      text-align: center;
+      font-size: 0.85rem;
+      min-height: 20px;
+      margin-top: 6px;
+      font-weight: 600;
+    }
+
+    .hint-warn {
+      color: #fbbf24;
+    }
+
+    .hint-fail {
+      color: #f87171;
+    }
+
+    /* Нижня панель */
+    .footer-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .bot-signature {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 6px 16px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    /* Фінальний екран завершення */
+    .final-modal {
+      display: none;
+      text-align: center;
+      padding: 30px 15px;
+    }
+
+    .final-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.8rem;
+      color: var(--cyan-neon);
+      margin-bottom: 12px;
+      text-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+    }
+
+    .final-subtitle {
+      font-size: 1.05rem;
+      color: #cbd5e1;
+      margin-bottom: 24px;
+    }
+
+    .cat-container {
+      width: 250px;
+      height: 250px;
+      margin: 0 auto 24px auto;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 2px solid var(--cyan-neon);
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.4);
+      background: #0b1120;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cat-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .score-summary {
+      font-family: 'Orbitron', monospace;
+      font-size: 1.2rem;
+      margin-bottom: 24px;
+      color: #ffffff;
+    }
+
+    .restart-btn {
+      padding: 14px 36px;
+      background: linear-gradient(135deg, #0ea5e9, #2563eb);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-family: 'Exo 2', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);
+      transition: all 0.2s ease;
+    }
+
+    .restart-btn:hover {
+      box-shadow: 0 0 30px rgba(14, 165, 233, 0.8);
+      transform: scale(1.03);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hud-card">
+    <!-- Звичайний вигляд тесту -->
+    <div id="test-view">
+      <!-- Верхній статус -->
+      <div class="top-bar">
+        <div class="progress-meta">
+          <div class="status-dot"></div>
+          <span>ПРОГРЕС</span>
+        </div>
+        <div style="font-family: 'Orbitron', monospace;" id="step-counter">1/20</div>
+        <div class="badge-group">
+          <div class="pill-badge">
+            БАЛИ: <span class="val" id="score-val">0</span>
+          </div>
+          <div class="pill-badge">
+            СТРІК: <span class="val streak-val">⚡ <span id="streak-val">0</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Лінія індикатора -->
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+
+      <!-- Кнопки-номери 1-20 -->
+      <div class="steps-row" id="steps-row">
+        <!-- Генерується динамічно через JS -->
+      </div>
+
+      <!-- Основний блок задачі -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="category-chip">МНОЖЕННЯ</div>
+          <div class="status-chip" id="task-status">⚙️ В процесі</div>
+        </div>
+
+        <h2 class="problem-title">ОБЧИСЛИ ЗНАЧЕННЯ</h2>
+        <p class="problem-desc">Знайдіть добуток чисел і запишіть результат у поле нижче:</p>
+
+        <!-- Поле з математичним виразом -->
+        <div class="math-display-panel">
+          <div class="math-expression" id="math-expression">2 × 2</div>
+        </div>
+
+        <!-- Інтерактивне введення -->
+        <div class="input-section">
+          <input 
+            type="number" 
+            id="user-answer" 
+            class="answer-field" 
+            placeholder="?" 
+            autocomplete="off" 
+            inputmode="numeric"
+          />
+          <button class="submit-button" id="submit-btn" onclick="checkAnswer()">ВІДПОВІСТИ</button>
+          <div class="attempt-hint" id="attempt-hint"></div>
+        </div>
+      </div>
+
+      <!-- Підвал -->
+      <div class="footer-bar">
+        <div class="bot-signature">
+          <span>🤖</span>
+          <span>Мат-Бот</span>
+        </div>
+        <div style="font-size: 0.8rem; color: #64748b;">
+          Спроба: <span id="attempt-badge" style="color: var(--cyan-neon);">1 / 2</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Фінальний екран -->
+    <div id="final-view" class="final-modal">
+      <h2 class="final-title" id="final-header">МІСІЮ ЗАВЕРШЕНО!</h2>
+      <p class="final-subtitle" id="final-sub">Результати тестування:</p>
+      
+      <!-- Контейнер для котика (відобразиться, якщо 20/20) -->
+      <div id="cat-box" class="cat-container" style="display: none;">
+        <img 
+          src="https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&w=600&q=80" 
+          alt="Кіт показує лайк" 
+          title="Супер-результат!"
+        />
+      </div>
+
+      <div class="score-summary" id="score-summary"></div>
+      <button class="restart-btn" onclick="startNewTest()">ПРОЙТИ ЩЕ РАЗ</button>
+    </div>
+  </div>
+
+  <script>
+    const TOTAL_QUESTIONS = 20;
+    let questions = [];
+    let currentIndex = 0;
+    let score = 0;
+    let streak = 0;
+    let attemptsLeft = 2;
+    let questionResults = []; // true, false або null
+
+    // Генерація випадкових прикладів таблиці множення від 2 до 9
+    function generateQuestions() {
+      const list = [];
+      while (list.length < TOTAL_QUESTIONS) {
+        const a = Math.floor(Math.random() * 8) + 2; // 2..9
+        const b = Math.floor(Math.random() * 8) + 2; // 2..9
+        list.push({ a, b, answer: a * b });
+      }
+      return list;
+    }
+
+    // Запуск/скидання тесту
+    function startNewTest() {
+      questions = generateQuestions();
+      currentIndex = 0;
+      score = 0;
+      streak = 0;
+      attemptsLeft = 2;
+      questionResults = new Array(TOTAL_QUESTIONS).fill(null);
+
+      document.getElementById('test-view').style.display = 'block';
+      document.getElementById('final-view').style.display = 'none';
+
+      renderStepPills();
+      updateScoreUI();
+      loadCurrentQuestion();
+    }
+
+    // Рендер кнопок 1-20
+    function renderStepPills() {
+      const container = document.getElementById('steps-row');
+      container.innerHTML = '';
+      for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+        const pill = document.createElement('div');
+        pill.className = 'step-item';
+        pill.id = `pill-${i}`;
+        pill.innerText = i + 1;
+        container.appendChild(pill);
+      }
+    }
+
+    // Завантаження поточного завдання
+    function loadCurrentQuestion() {
+      attemptsLeft = 2;
+      const q = questions[currentIndex];
+      
+      document.getElementById('step-counter').innerText = `${currentIndex + 1}/${TOTAL_QUESTIONS}`;
+      document.getElementById('progress-fill').style.width = `${((currentIndex + 1) / TOTAL_QUESTIONS) * 100}%`;
+      document.getElementById('math-expression').innerText = `${q.a} × ${q.b}`;
+      
+      const input = document.getElementById('user-answer');
+      input.value = '';
+      input.disabled = false;
+      input.focus();
+
+      document.getElementById('attempt-hint').innerText = '';
+      document.getElementById('attempt-badge').innerText = '1 / 2';
+      document.getElementById('task-status').innerText = '⚙️ В процесі';
+
+      // Оновлення стану кнопок 1-20
+      for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+        const p = document.getElementById(`pill-${i}`);
+        p.classList.remove('active');
+        if (i === currentIndex) {
+          p.classList.add('active');
+        }
+      }
+    }
+
+    // Перевірка відповіді учня
+    function checkAnswer() {
+      const input = document.getElementById('user-answer');
+      const hint = document.getElementById('attempt-hint');
+      const val = parseInt(input.value.trim(), 10);
+      const correct = questions[currentIndex].answer;
+
+      if (isNaN(val)) {
+        hint.className = 'attempt-hint hint-warn';
+        hint.innerText = 'Введіть числове значення!';
+        input.focus();
+        return;
+      }
+
+      if (val === correct) {
+        // Вірна відповідь
+        triggerConfetti();
+        score++;
+        streak++;
+        questionResults[currentIndex] = true;
+
+        const currentPill = document.getElementById(`pill-${currentIndex}`);
+        currentPill.classList.remove('active');
+        currentPill.classList.add('passed');
+
+        updateScoreUI();
+        input.disabled = true;
+        hint.className = 'attempt-hint';
+        hint.style.color = 'var(--success-neon)';
+        hint.innerText = 'Чудово! Абсолютно правильно!';
+
+        setTimeout(nextQuestion, 1200);
+      } else {
+        // Невірна відповідь
+        attemptsLeft--;
+        input.classList.add('shake');
+        setTimeout(() => input.classList.remove('shake'), 400);
+
+        if (attemptsLeft === 1) {
+          // Даємо другу спробу
+          streak = 0;
+          updateScoreUI();
+          document.getElementById('attempt-badge').innerText = '2 / 2';
+          hint.className = 'attempt-hint hint-warn';
+          hint.innerText = 'Не зовсім так. Спробуй ще раз! Залишилась 1 спроба.';
+          input.value = '';
+          input.focus();
+        } else {
+          // Спроби вичерпано
+          streak = 0;
+          questionResults[currentIndex] = false;
+
+          const currentPill = document.getElementById(`pill-${currentIndex}`);
+          currentPill.classList.remove('active');
+          currentPill.classList.add('failed');
+
+          updateScoreUI();
+          input.disabled = true;
+          document.getElementById('attempt-badge').innerText = '0 / 2';
+          hint.className = 'attempt-hint hint-fail';
+          hint.innerText = `Невірно. Правильна відповідь: ${correct}`;
+
+          setTimeout(nextQuestion, 2000);
+        }
+      }
+    }
+
+    // Перехід до наступного запитання або завершення
+    function nextQuestion() {
+      currentIndex++;
+      if (currentIndex < TOTAL_QUESTIONS) {
+        loadCurrentQuestion();
+      } else {
+        finishTest();
+      }
+    }
+
+    // Оновлення балів та стріку
+    function updateScoreUI() {
+      document.getElementById('score-val').innerText = score;
+      document.getElementById('streak-val').innerText = streak;
+    }
+
+    // Салют конфеті
+    function triggerConfetti() {
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 70,
+          spread: 60,
+          origin: { y: 0.65 },
+          colors: ['#00f0ff', '#3b82f6', '#f59e0b', '#22c55e']
+        });
+      }
+    }
+
+    // Завершення тесту
+    function finishTest() {
+      document.getElementById('test-view').style.display = 'none';
+      const finalView = document.getElementById('final-view');
+      finalView.style.display = 'block';
+
+      const catBox = document.getElementById('cat-box');
+      const header = document.getElementById('final-header');
+      const sub = document.getElementById('final-sub');
+      const summary = document.getElementById('score-summary');
+
+      summary.innerText = `Правильних відповідей: ${score} з ${TOTAL_QUESTIONS}`;
+
+      if (score === TOTAL_QUESTIONS) {
+        // Всі відповіді вірні — показуємо котика і великий салют
+        catBox.style.display = 'flex';
+        header.innerText = 'ІДЕАЛЬНИЙ РЕЗУЛЬТАТ! 🚀';
+        sub.innerText = 'Ти знаєш таблицю множення бездоганно! Тримай котячий респект:';
+        
+        // Потрійний салют
+        triggerConfetti();
+        setTimeout(triggerConfetti, 400);
+        setTimeout(triggerConfetti, 800);
+      } else {
+        catBox.style.display = 'none';
+        header.innerText = 'ТЕСТ ЗАВЕРШЕНО';
+        sub.innerText = 'Гарна робота! Потренуйся ще трішки, щоб отримати 20 з 20 та відкрити секретного котика.';
+      }
+    }
+
+    // Дозволяємо надсилання по клавіші Enter
+    document.getElementById('user-answer').addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        checkAnswer();
+      }
+    });
+
+    // Ініціалізація при відкритті
+    startNewTest();
+  </script>
+</body>
+</html>
